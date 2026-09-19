@@ -1,18 +1,20 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <AssemblyTitle>Steam Achievement Manager</AssemblyTitle>
+    <AssemblyName>KFM Launcher</AssemblyName>
+    <AssemblyTitle>KFM Launcher</AssemblyTitle>
+    <Product>KFM Launcher</Product>
     <Company>Gibbed</Company>
     <Authors>Gibbed</Authors>
-    <Description>A manager for game achievements in Steam.</Description>
+    <Description>KFM Launcher</Description>
     <Copyright>Copyright © Gibbed 2019</Copyright>
   </PropertyGroup>
   <PropertyGroup>
     <Version>7.0.0</Version>
     <AssemblyVersion>7.0.0.0</AssemblyVersion>
-    <FileVersion>7.0.0.0</FileVersion>
+    <FileVersion>7.0.3.0</FileVersion>
   </PropertyGroup>
   <PropertyGroup>
-    <ApplicationIcon>Blank.ico</ApplicationIcon>
+    <ApplicationIcon>kf.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
   <PropertyGroup>
@@ -24,7 +26,14 @@
     <TargetFramework>net48</TargetFramework>
     <LangVersion>9.0</LangVersion>
     <Platforms>x86</Platforms>
+    <PlatformTarget>x86</PlatformTarget>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <UseWindowsForms>true</UseWindowsForms>
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+    <GenerateSupportedRuntime>false</GenerateSupportedRuntime>
+    <AutoGenerateBindingRedirects>false</AutoGenerateBindingRedirects>
+    <GenerateBindingRedirectsOutputType>false</GenerateBindingRedirectsOutputType>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x86' ">
     <OutputPath>..\bin\</OutputPath>
@@ -34,26 +43,23 @@
     <UseVSHostingProcess>false</UseVSHostingProcess>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="System.Windows.Forms" />
-  </ItemGroup>
-  <ItemGroup>
-    <Compile Update="DoubleBufferedListView.cs">
-      <SubType>Component</SubType>
-    </Compile>
-    <Compile Update="Manager.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Update="Resources.Designer.cs">
-      <AutoGen>True</AutoGen>
-      <DependentUpon>Resources.resx</DependentUpon>
-      <DesignTime>True</DesignTime>
-    </Compile>
-    <EmbeddedResource Update="Resources.resx">
-      <Generator>ResXFileCodeGenerator</Generator>
-      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
-    </EmbeddedResource>
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="..\SAM.API\SAM.API.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Costura.Fody" Version="5.7.0" PrivateAssets="all" ExcludeAssets="runtime" />
+    <PackageReference Include="Fody" Version="6.8.2" PrivateAssets="all" ExcludeAssets="runtime" />
+  </ItemGroup>
+  <ItemGroup>
+    <UpToDateCheckInput Include="kf.ico" />
+  </ItemGroup>
+  <Target Name="SingleFileOutput" AfterTargets="Build">
+    <ItemGroup>
+      <ExtraOutput Include="$(OutputPath)*.dll" />
+      <ExtraOutput Include="$(OutputPath)*.pdb" />
+      <ExtraOutput Include="$(OutputPath)*.xml" />
+      <ExtraOutput Include="$(OutputPath)*.exe.config" />
+      <ExtraOutput Include="$(OutputPath)kf.ico" />
+    </ItemGroup>
+    <Delete Files="@(ExtraOutput)" TreatErrorsAsWarnings="true" />
+  </Target>
 </Project>
