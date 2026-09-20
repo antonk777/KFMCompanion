@@ -85,7 +85,7 @@ namespace SAM.Game
                 return Fail("could not find companion executable");
             }
 
-            AppLog.Write("Starting Steam flush helper so Steam can drop the game session");
+            AppLog.Write("Starting Steam flush helper");
             var start = new ProcessStartInfo
             {
                 FileName = exe,

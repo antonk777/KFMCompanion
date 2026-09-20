@@ -1,6 +1,6 @@
 # KFM Companion
 
-KFM Companion is based on [Steam Achievement Manager](https://github.com/gibbed/SteamAchievementManager) (SAM). It was created to **save statistics**: the companion buffers in-game stats and achievements while Killing Floor is running, then saves after `KillingFloor.exe` exits so session progress is not lost.
+KFM Companion is based on [Steam Achievement Manager](https://github.com/gibbed/SteamAchievementManager) (SAM). It was created to **save statistics**: the companion writes incoming stats and achievements to Steam as they arrive while Killing Floor is running, then flushes once more after `KillingFloor.exe` exits.
 
 This application requires the [Steam client](https://store.steampowered.com/about/), a Steam account and network access. Steam must be running and the user must be logged in.
 

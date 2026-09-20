@@ -1,7 +1,7 @@
 # KFM Companion — stats protocol (for agents)
 
 This is the client contract for **Killing Floor** (Steam AppId **1250**).
-The game process talks to **KFM Companion** over local TCP. The companion buffers events while the game is running, then writes to Steam **only after `KillingFloor.exe` exits**.
+The game process talks to **KFM Companion** over local TCP. The companion writes each incoming stat/achievement to Steam **as it arrives** while `KillingFloor.exe` is running, then flushes once more after the process exits.
 
 Do **not** use WebSockets. Do **not** send JSON. Do **not** send INI files.
 
@@ -18,7 +18,7 @@ Do **not** use WebSockets. Do **not** send JSON. Do **not** send INI files.
 
 If connect fails, the companion is not running. Retry a few times; do not block the game forever.
 
-The game **may** keep using its own `steam_api` during play. TCP events are an extra buffer. After exit the companion reads current Steam values and applies a **monotone merge** (never lowers a stat, never locks an already unlocked achievement).
+The game **may** keep using its own `steam_api` during play. TCP events are an extra buffer. The companion reads current Steam values and applies a **monotone merge** (never lowers a stat, never locks an already unlocked achievement).
 
 ## Command format
 
@@ -29,7 +29,7 @@ COMMAND [id] [value]
 - Command names are case-insensitive (`ACHIEVEMENT` = `achievement`).
 - Fields are split on whitespace.
 - `id` is the Steamworks **API name** (not the display title). If an id contains spaces, that is allowed; the last token is always the numeric flag/value.
-- Send `STORE` after a batch if you want; it does **not** write to Steam immediately. It only acknowledges. Flush to Steam happens when the game process exits.
+- Send `STORE` after a batch if you want; it does **not** write to Steam by itself. `STAT_*` / `ACHIEVEMENT` already trigger a Steam flush when they arrive. A final flush also runs when the game process exits.
 
 ## Commands
 
@@ -45,7 +45,7 @@ Example:
 ACHIEVEMENT ACH_WIN 1
 ```
 
-- `1` = unlock (buffered until game exit).
+- `1` = unlock (written to Steam when this line arrives).
 - `0` = ignored on purpose. The companion will **not** lock/clear achievements.
 - If Steam already has it unlocked, flush is a no-op.
 
@@ -61,7 +61,7 @@ Example:
 STAT_INT kills 42
 ```
 
-During the session the companion keeps the **maximum** value seen for that id.
+Send the **current absolute total** the mutator knows for that id (not a session delta). During the session the companion keeps the **maximum** value seen.
 
 On flush: write to Steam only if `buffered > current Steam value`.
 
@@ -91,7 +91,7 @@ QUIT
 |---|---|---|
 | `STORE` | `OK BUFFERED` | Session dirty flag only. **Not** Steam `StoreStats`. |
 | `PING` | `PONG` | Health check. |
-| `QUIT` | `OK` | Does **not** exit the companion and does **not** trigger Steam flush. Flush is tied to `KillingFloor` process exit. |
+| `QUIT` | `OK` | Does **not** exit the companion and does **not** trigger Steam flush. Steam writes happen on each `STAT_*` / `ACHIEVEMENT` and after game exit. |
 
 ## Replies (one line)
 
@@ -112,6 +112,7 @@ Use `TcpLink` (or a native socket) to `127.0.0.1:27250`.
 - Read replies the same way (one line).
 - Do **not** implement HTTP or a WebSocket handshake.
 - Prefer sending events when they happen (achievement unlocked, stat increased). Also OK to dump a snapshot on map change / disconnect / game end, as long as values are **absolute totals** (or at least non-decreasing), not deltas.
+- Each `STAT_*` / `ACHIEVEMENT` line is flushed to Steam when it arrives. You do not throttle Steam yourself.
 
 Good:
 
@@ -129,15 +130,18 @@ STAT_INT kills +1
 
 The companion does not add deltas. It stores max(incoming).
 
-## What the companion does after the game closes
+## What the companion writes to Steam
+
+While `KillingFloor.exe` is running, each incoming `STAT_*` / `ACHIEVEMENT` triggers a flush (`RequestUserStats`, monotone merge, `StoreStats` only if something changed). If another flush is already running, the latest buffer is written as soon as that one finishes. The buffer is kept (max values stay) so later flushes skip values Steam already has.
+
+If a live flush fails, retry on the next incoming update, and always try again after the game exits.
+
+After the game closes:
 
 1. Stop listening.
 2. Wait ~2s so Steam releases the game session.
-3. `Initialize(1250)`, `RequestUserStats`.
-4. For each buffered achievement: unlock only if Steam still has it locked.
-5. For each buffered stat: `SetStat` only if new value is **greater**.
-6. `StoreStats` only if something actually changed.
-7. No Windows toast if nothing was sent (0 ach, 0 stats).
+3. Same merge / `StoreStats` as above.
+4. No Windows toast if nothing was sent (0 ach, 0 stats). Toast only if the **final** flush fails.
 
 ## IDs
 

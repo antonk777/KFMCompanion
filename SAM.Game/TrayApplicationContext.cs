@@ -19,6 +19,7 @@ namespace SAM.Game
         private static readonly TimeSpan ProcessGoneGrace = TimeSpan.FromSeconds(3);
 
         private readonly SessionBuffer _buffer = new();
+        private readonly SemaphoreSlim _flushLock = new(1, 1);
         private readonly NotifyIcon _notifyIcon;
         private readonly ToolStripMenuItem _statusItem;
         private readonly ToolStripMenuItem _launchItem;
@@ -31,6 +32,7 @@ namespace SAM.Game
         private volatile bool _gameRunning;
         private volatile bool _sessionBusy;
         private volatile bool _waitingForGame;
+        private volatile bool _steamDirty;
 
         public TrayApplicationContext(EventWaitHandle activate)
         {
@@ -142,6 +144,7 @@ namespace SAM.Game
         private async Task<bool> RunOneSessionAsync(CancellationToken cancellationToken)
         {
             this._buffer.Clear();
+            this._steamDirty = false;
 
             try
             {
@@ -181,6 +184,7 @@ namespace SAM.Game
                     AppLog.Write("Watching game process: " + GameProcessName + " (PID " + process.Id + ")");
                     this._gameRunning = true;
                     this.UpdateRunningStatus();
+                    this.RequestLiveFlush();
                     await GameProcessWatcher.WaitForExitAsync(process, cancellationToken).ConfigureAwait(false);
                     AppLog.Write("Game process exited (PID " + process.Id + ")");
                 }
@@ -203,9 +207,96 @@ namespace SAM.Game
             this._server = null;
             AppLog.Write("TCP server stopped");
 
+            await this.FlushToSteamAsync(false, cancellationToken).ConfigureAwait(false);
+
+            AppLog.Write("Ready for the next session. Start the game yourself or click Launch game.");
+            return true;
+        }
+
+        private void RequestLiveFlush()
+        {
+            if (this._gameRunning == false || this._exiting == true || this._buffer.HasWork == false)
+            {
+                return;
+            }
+
+            this._steamDirty = true;
+            _ = this.FlushLiveIfDirtyAsync();
+        }
+
+        private async Task FlushLiveIfDirtyAsync()
+        {
+            try
+            {
+                await this._flushLock.WaitAsync(this._cts.Token).ConfigureAwait(false);
+            }
+            catch (ObjectDisposedException)
+            {
+                return;
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+
+            try
+            {
+                while (this._steamDirty == true &&
+                       this._gameRunning == true &&
+                       this._exiting == false &&
+                       this._cts.IsCancellationRequested == false)
+                {
+                    this._steamDirty = false;
+                    await this.FlushToSteamCoreAsync(true, this._cts.Token).ConfigureAwait(false);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+            finally
+            {
+                this._flushLock.Release();
+            }
+
+            if (this._steamDirty == true && this._gameRunning == true && this._exiting == false)
+            {
+                _ = this.FlushLiveIfDirtyAsync();
+            }
+        }
+
+        private async Task FlushToSteamAsync(bool live, CancellationToken cancellationToken)
+        {
+            await this._flushLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                await this.FlushToSteamCoreAsync(live, cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                this._flushLock.Release();
+            }
+        }
+
+        private async Task FlushToSteamCoreAsync(bool live, CancellationToken cancellationToken)
+        {
+            if (this._buffer.HasWork == false)
+            {
+                return;
+            }
+
             this.SetStatus("Status: Flushing to Steam…", AppName + " — flushing");
-            AppLog.Write("Waiting " + SteamReleaseDelay.TotalSeconds + "s for Steam to release the game session");
-            await Task.Delay(SteamReleaseDelay, cancellationToken).ConfigureAwait(false);
+            if (live == true)
+            {
+                AppLog.Write("Flushing buffered stats to Steam");
+            }
+            else
+            {
+                AppLog.Write("Waiting " + SteamReleaseDelay.TotalSeconds + "s for Steam to release the game session");
+                await Task.Delay(SteamReleaseDelay, cancellationToken).ConfigureAwait(false);
+            }
 
             FlushResult result;
             try
@@ -238,6 +329,22 @@ namespace SAM.Game
                 ? "Flush finished: " + result.Message +
                   " (applied " + result.AchievementsApplied + " ach, " + result.StatsApplied + " stats)"
                 : "Flush finished with error: " + result.Message);
+
+            if (live == true)
+            {
+                if (result.Success == false)
+                {
+                    AppLog.Write("Live Steam flush failed; will retry on the next update and after the game exits");
+                }
+
+                if (this._gameRunning == true)
+                {
+                    this.UpdateRunningStatus();
+                }
+
+                return;
+            }
+
             if (result.Success == true)
             {
                 this.SetStatus("Status: Waiting for game…", AppName + " — waiting for game");
@@ -247,9 +354,6 @@ namespace SAM.Game
                 this.SetStatus("Status: Error — flush failed", AppName + " — flush failed");
                 this.ShowBalloon(ToolTipIcon.Error, AppName, result.Message);
             }
-
-            AppLog.Write("Ready for the next session. Start the game yourself or click Launch game.");
-            return true;
         }
 
         private async Task<Process> WaitForGameProcessAsync(
@@ -287,12 +391,12 @@ namespace SAM.Game
 
         private void OnBufferChanged()
         {
-            if (this._gameRunning == false)
+            if (this._gameRunning == true)
             {
-                return;
+                this.UpdateRunningStatus();
             }
 
-            this.UpdateRunningStatus();
+            this.RequestLiveFlush();
         }
 
         private void UpdateRunningStatus()
@@ -488,6 +592,7 @@ namespace SAM.Game
             {
                 this._cts.Cancel();
                 this._server?.Dispose();
+                this._flushLock.Dispose();
                 this._notifyIcon.Visible = false;
                 this._notifyIcon.Icon?.Dispose();
                 this._notifyIcon.Dispose();
