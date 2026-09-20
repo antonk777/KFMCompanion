@@ -49,7 +49,13 @@ namespace SAM.Game
             try
             {
                 WriteJob(jobPath, appId, intStats, floatStats, achievements);
-                return RunHelper(jobPath, resultPath);
+                var result = RunHelper(jobPath, resultPath);
+                if (result.Success == true)
+                {
+                    buffer.DropUnchanged(intStats, floatStats, achievements);
+                }
+
+                return result;
             }
             finally
             {

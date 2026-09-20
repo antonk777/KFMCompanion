@@ -132,9 +132,9 @@ The companion does not add deltas. It stores max(incoming).
 
 ## What the companion writes to Steam
 
-While `KillingFloor.exe` is running, each incoming `STAT_*` / `ACHIEVEMENT` triggers a flush (`RequestUserStats`, monotone merge, `StoreStats` only if something changed). If another flush is already running, the latest buffer is written as soon as that one finishes. The buffer is kept (max values stay) so later flushes skip values Steam already has.
+While `KillingFloor.exe` is running, each incoming `STAT_*` / `ACHIEVEMENT` triggers a flush (`RequestUserStats`, monotone merge, `StoreStats` only if something changed). If another flush is already running, the latest buffer is written as soon as that one finishes. After a successful flush those values are dropped from the buffer; newer higher values still wait to be sent.
 
-If a live flush fails, retry on the next incoming update, and always try again after the game exits.
+If a live flush fails, retry on the next incoming update, and always try again after the game exits **if the buffer still has work**. If the buffer is empty when the game closes, the companion does **not** start the Steam helper.
 
 After the game closes:
 

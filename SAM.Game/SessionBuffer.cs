@@ -126,5 +126,57 @@ namespace SAM.Game
                 achievements = new List<string>(this._achievements);
             }
         }
+
+        public void DropUnchanged(
+            Dictionary<string, int> intStats,
+            Dictionary<string, float> floatStats,
+            List<string> achievements)
+        {
+            bool changed = false;
+            lock (this._lock)
+            {
+                if (achievements != null)
+                {
+                    foreach (var id in achievements)
+                    {
+                        if (this._achievements.Remove(id) == true)
+                        {
+                            changed = true;
+                        }
+                    }
+                }
+
+                if (intStats != null)
+                {
+                    foreach (var pair in intStats)
+                    {
+                        if (this._intStats.TryGetValue(pair.Key, out var current) == true &&
+                            current <= pair.Value)
+                        {
+                            this._intStats.Remove(pair.Key);
+                            changed = true;
+                        }
+                    }
+                }
+
+                if (floatStats != null)
+                {
+                    foreach (var pair in floatStats)
+                    {
+                        if (this._floatStats.TryGetValue(pair.Key, out var current) == true &&
+                            current <= pair.Value)
+                        {
+                            this._floatStats.Remove(pair.Key);
+                            changed = true;
+                        }
+                    }
+                }
+            }
+
+            if (changed == true)
+            {
+                this.Changed?.Invoke();
+            }
+        }
     }
 }

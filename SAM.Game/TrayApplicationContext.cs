@@ -207,7 +207,15 @@ namespace SAM.Game
             this._server = null;
             AppLog.Write("TCP server stopped");
 
-            await this.FlushToSteamAsync(false, cancellationToken).ConfigureAwait(false);
+            if (this._buffer.HasWork == false)
+            {
+                AppLog.Write("No stats to send after game exit, skipping Steam helper");
+                this.SetStatus("Status: Waiting for game…", AppName + " — waiting for game");
+            }
+            else
+            {
+                await this.FlushToSteamAsync(false, cancellationToken).ConfigureAwait(false);
+            }
 
             AppLog.Write("Ready for the next session. Start the game yourself or click Launch game.");
             return true;

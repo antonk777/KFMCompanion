@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.3.0
+
+- After `KillingFloor.exe` exits, do not start the Steam helper if there is nothing left to send.
+- Drop successfully flushed stats from the buffer so a later empty exit does not write to Steam again.
+
 ## v1.2.0
 
 - Write stats and achievements to Steam as soon as they arrive over TCP, instead of waiting until Killing Floor exits.
