@@ -14,7 +14,7 @@ if errorlevel 1 (
 set "CONFIG=Debug"
 if /i "%~1"=="release" set "CONFIG=Release"
 
-echo Building KFM Launcher (%CONFIG% x86)...
+echo Building KFM Companion (%CONFIG% x86)...
 dotnet build SAM.sln -c %CONFIG% -p:Platform=x86 -t:Rebuild
 if errorlevel 1 (
     echo.
@@ -25,8 +25,8 @@ if errorlevel 1 (
 
 echo.
 if /i "%CONFIG%"=="Release" (
-    echo OK: "%~dp0upload\KFM Launcher.exe"
+    echo OK: "%~dp0upload\KFM Companion.exe"
 ) else (
-    echo OK: "%~dp0bin\KFM Launcher.exe"
+    echo OK: "%~dp0bin\KFM Companion.exe"
 )
 pause

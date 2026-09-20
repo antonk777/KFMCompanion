@@ -1,7 +1,7 @@
-# KFM Launcher — stats protocol (for agents)
+# KFM Companion — stats protocol (for agents)
 
 This is the client contract for **Killing Floor** (Steam AppId **1250**).
-The game process talks to **KFM Launcher** over local TCP. The launcher buffers events while the game is running, then writes to Steam **only after `KillingFloor.exe` exits**.
+The game process talks to **KFM Companion** over local TCP. The companion buffers events while the game is running, then writes to Steam **only after `KillingFloor.exe` exits**.
 
 Do **not** use WebSockets. Do **not** send JSON. Do **not** send INI files.
 
@@ -14,11 +14,11 @@ Do **not** use WebSockets. Do **not** send JSON. Do **not** send INI files.
 | Transport | TCP |
 | Encoding | UTF-8 or ASCII |
 | Framing | **one command = one line**, terminated by `\n` (`\r\n` is OK) |
-| When | Connect after the launcher is running (it starts TCP, then launches the game) |
+| When | Connect after the companion is running (it starts TCP and waits). The game may be launched from Steam or via the companion. |
 
-If connect fails, the launcher is not running. Retry a few times; do not block the game forever.
+If connect fails, the companion is not running. Retry a few times; do not block the game forever.
 
-The game **may** keep using its own `steam_api` during play. TCP events are an extra buffer. After exit the launcher reads current Steam values and applies a **monotone merge** (never lowers a stat, never locks an already unlocked achievement).
+The game **may** keep using its own `steam_api` during play. TCP events are an extra buffer. After exit the companion reads current Steam values and applies a **monotone merge** (never lowers a stat, never locks an already unlocked achievement).
 
 ## Command format
 
@@ -46,7 +46,7 @@ ACHIEVEMENT ACH_WIN 1
 ```
 
 - `1` = unlock (buffered until game exit).
-- `0` = ignored on purpose. The launcher will **not** lock/clear achievements.
+- `0` = ignored on purpose. The companion will **not** lock/clear achievements.
 - If Steam already has it unlocked, flush is a no-op.
 
 ### Integer stat
@@ -61,7 +61,7 @@ Example:
 STAT_INT kills 42
 ```
 
-During the session the launcher keeps the **maximum** value seen for that id.
+During the session the companion keeps the **maximum** value seen for that id.
 
 On flush: write to Steam only if `buffered > current Steam value`.
 
@@ -91,7 +91,7 @@ QUIT
 |---|---|---|
 | `STORE` | `OK BUFFERED` | Session dirty flag only. **Not** Steam `StoreStats`. |
 | `PING` | `PONG` | Health check. |
-| `QUIT` | `OK` | Does **not** exit the launcher and does **not** trigger Steam flush. Flush is tied to `KillingFloor` process exit. |
+| `QUIT` | `OK` | Does **not** exit the companion and does **not** trigger Steam flush. Flush is tied to `KillingFloor` process exit. |
 
 ## Replies (one line)
 
@@ -127,9 +127,9 @@ Bad:
 STAT_INT kills +1
 ```
 
-The launcher does not add deltas. It stores max(incoming).
+The companion does not add deltas. It stores max(incoming).
 
-## What the launcher does after the game closes
+## What the companion does after the game closes
 
 1. Stop listening.
 2. Wait ~2s so Steam releases the game session.

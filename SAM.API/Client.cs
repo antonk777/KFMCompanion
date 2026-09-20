@@ -113,6 +113,14 @@ namespace SAM.API
                 this._Pipe = 0;
             }
 
+            if (this.SteamClient != null)
+            {
+                this.SteamClient.ShutdownIfAllPipesClosed();
+            }
+
+            Environment.SetEnvironmentVariable("SteamAppId", null);
+            Environment.SetEnvironmentVariable("SteamGameId", null);
+
             this._IsDisposed = true;
         }
 

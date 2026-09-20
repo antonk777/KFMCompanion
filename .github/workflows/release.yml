@@ -1,4 +1,4 @@
-# Publish KFM Launcher.exe to GitHub Releases.
+# Publish KFM Companion.exe to GitHub Releases.
 #
 # Option 1 — push a version tag from the commit you want to ship:
 #   git tag v1.0.0
@@ -77,12 +77,12 @@ jobs:
       - name: Stage EXE
         shell: pwsh
         run: |
-          $built = "upload\KFM Launcher.exe"
+          $built = "upload\KFM Companion.exe"
           if (-not (Test-Path $built)) {
             throw "Expected '$built' after Release build."
           }
-          Copy-Item $built "upload\KFM-Launcher.exe"
-          Get-Item "upload\KFM-Launcher.exe" | Select-Object Name, Length, LastWriteTime
+          Copy-Item $built "upload\KFM-Companion.exe"
+          Get-Item "upload\KFM-Companion.exe" | Select-Object Name, Length, LastWriteTime
 
       - name: Publish GitHub Release
         env:
@@ -92,8 +92,8 @@ jobs:
           $tag = "${{ steps.version.outputs.tag }}"
           $ghArgs = @(
             "release", "create", $tag,
-            "upload/KFM-Launcher.exe#KFM-Launcher.exe",
-            "--title", "KFM Launcher $tag",
+            "upload/KFM-Companion.exe#KFM-Companion.exe",
+            "--title", "KFM Companion $tag",
             "--generate-notes"
           )
           if ("${{ github.ref_type }}" -ne "tag") {

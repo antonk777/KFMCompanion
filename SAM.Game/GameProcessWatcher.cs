@@ -74,8 +74,10 @@ namespace SAM.Game
             TimeSpan timeout,
             CancellationToken cancellationToken)
         {
-            var deadline = DateTime.UtcNow + timeout;
-            while (DateTime.UtcNow < deadline)
+            DateTime? deadline = timeout == Timeout.InfiniteTimeSpan
+                ? (DateTime?)null
+                : DateTime.UtcNow + timeout;
+            while (deadline == null || DateTime.UtcNow < deadline.Value)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 foreach (var process in GetProcesses(processName))
