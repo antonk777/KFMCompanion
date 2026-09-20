@@ -47,6 +47,27 @@ namespace SAM.Game
             return ids;
         }
 
+        public static Process TryGetRunningProcess(string processName)
+        {
+            foreach (var process in GetProcesses(processName))
+            {
+                try
+                {
+                    if (process.HasExited == false)
+                    {
+                        return process;
+                    }
+                }
+                catch (InvalidOperationException)
+                {
+                }
+
+                process.Dispose();
+            }
+
+            return null;
+        }
+
         public static async Task<Process> WaitForNewProcessAsync(
             string processName,
             HashSet<int> existingIds,

@@ -1,0 +1,105 @@
+# Publish KFM Launcher.exe to GitHub Releases.
+#
+# Option 1 — push a version tag from the commit you want to ship:
+#   git tag v1.0.0
+#   git push origin v1.0.0
+#
+# Option 2 — GitHub → Actions → Release → Run workflow, enter v1.0.0
+#   (uses the branch/commit you pick in the UI)
+#
+# Use vMAJOR.MINOR.PATCH (optional -beta / -rc.1 suffix).
+# A hyphenated suffix (v1.0.0-beta) is published as a pre-release.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (e.g. v1.0.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: version
+        shell: pwsh
+        run: |
+          $tag = if ("${{ github.ref_type }}" -eq "tag") {
+            "${{ github.ref_name }}"
+          } else {
+            "${{ inputs.version }}"
+          }
+          $tag = "$tag".Trim()
+          if (-not $tag) {
+            throw "Set a version like v1.0.0 (git tag or workflow input)."
+          }
+          if ($tag -notmatch '^v') {
+            $tag = "v$tag"
+          }
+          $numeric = $tag.Substring(1)
+          if ($numeric -notmatch '^\d+\.\d+\.\d+') {
+            throw "Version must look like v1.0.0 (got '$tag')."
+          }
+          $assembly = if ($numeric -match '^(\d+\.\d+\.\d+)') { "$($Matches[1]).0" } else { "$numeric.0" }
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          "version=$numeric" >> $env:GITHUB_OUTPUT
+          "assembly=$assembly" >> $env:GITHUB_OUTPUT
+          "prerelease=$($numeric -match '-')" >> $env:GITHUB_OUTPUT
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Build
+        run: >
+          dotnet build SAM.Game/SAM.Game.csproj
+          -c Release
+          -p:Platform=x86
+          -p:Version=${{ steps.version.outputs.version }}
+          -p:AssemblyVersion=${{ steps.version.outputs.assembly }}
+          -p:FileVersion=${{ steps.version.outputs.assembly }}
+          --verbosity minimal
+
+      - name: Stage EXE
+        shell: pwsh
+        run: |
+          $built = "upload\KFM Launcher.exe"
+          if (-not (Test-Path $built)) {
+            throw "Expected '$built' after Release build."
+          }
+          Copy-Item $built "upload\KFM-Launcher.exe"
+          Get-Item "upload\KFM-Launcher.exe" | Select-Object Name, Length, LastWriteTime
+
+      - name: Publish GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          $tag = "${{ steps.version.outputs.tag }}"
+          $ghArgs = @(
+            "release", "create", $tag,
+            "upload/KFM-Launcher.exe#KFM-Launcher.exe",
+            "--title", "KFM Launcher $tag",
+            "--generate-notes"
+          )
+          if ("${{ github.ref_type }}" -ne "tag") {
+            $ghArgs += @("--target", "${{ github.sha }}")
+          }
+          if ("${{ steps.version.outputs.prerelease }}" -eq "true") {
+            $ghArgs += "--prerelease"
+          }
+          gh @ghArgs

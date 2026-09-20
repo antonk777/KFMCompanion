@@ -13,7 +13,7 @@ namespace SAM.Game
     {
         private const string AppName = "KFM Launcher";
         private const long AppId = 1250;
-        private const int Port = 27000;
+        private const int Port = 27250;
         private const string GameProcessName = "KillingFloor";
         private static readonly TimeSpan GameStartTimeout = TimeSpan.FromSeconds(120);
         private static readonly TimeSpan SteamReleaseDelay = TimeSpan.FromSeconds(2);
@@ -96,26 +96,35 @@ namespace SAM.Game
 
                 var existing = GameProcessWatcher.GetProcessIds(GameProcessName);
                 AppLog.Write("Existing '" + GameProcessName + "' processes: " + existing.Count);
-                this.SetStatus("Status: Waiting for game…", AppName + " — waiting for game");
-                AppLog.Write("Waiting for game process '" + GameProcessName + "'");
 
-                try
+                Process gameProcess = GameProcessWatcher.TryGetRunningProcess(GameProcessName);
+                if (gameProcess != null)
                 {
-                    GameProcessWatcher.LaunchViaSteam(AppId);
-                    AppLog.Write("Launched steam://run/" + AppId);
+                    AppLog.Write("Game already running (PID " + gameProcess.Id + "), not launching");
                 }
-                catch (Exception e)
+                else
                 {
-                    AppLog.Write("Failed to launch game: " + e.Message);
-                    this.FailAndStay("failed to launch game", e.Message);
-                    return;
-                }
+                    this.SetStatus("Status: Waiting for game…", AppName + " — waiting for game");
+                    AppLog.Write("Waiting for game process '" + GameProcessName + "'");
 
-                try
-                {
-                    using (var process = await this.WaitForGameProcessAsync(existing, cancellationToken).ConfigureAwait(false))
+                    try
                     {
-                        AppLog.Write("Game process started: " + GameProcessName + " (PID " + process.Id + ")");
+                        GameProcessWatcher.LaunchViaSteam(AppId);
+                        AppLog.Write("Launched steam://run/" + AppId);
+                    }
+                    catch (Exception e)
+                    {
+                        AppLog.Write("Failed to launch game: " + e.Message);
+                        this.FailAndStay("failed to launch game", e.Message);
+                        return;
+                    }
+                }
+
+                try
+                {
+                    using (var process = gameProcess ?? await this.WaitForGameProcessAsync(existing, cancellationToken).ConfigureAwait(false))
+                    {
+                        AppLog.Write("Watching game process: " + GameProcessName + " (PID " + process.Id + ")");
                         this._gameRunning = true;
                         this.UpdateRunningStatus();
                         await GameProcessWatcher.WaitForExitAsync(process, cancellationToken).ConfigureAwait(false);
