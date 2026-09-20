@@ -103,3 +103,15 @@ jobs:
             $ghArgs += "--prerelease"
           }
           gh @ghArgs
+
+      - name: Rebuild download site
+        env:
+          HOOK: ${{ secrets.KFM_SITE_DEPLOY_HOOK }}
+        shell: pwsh
+        run: |
+          if (-not $env:HOOK) {
+            Write-Host "Skip site rebuild: set repo secret KFM_SITE_DEPLOY_HOOK to a Cloudflare Pages Deploy Hook URL."
+            return
+          }
+          Invoke-RestMethod -Method Post -Uri $env:HOOK | Out-Null
+          Write-Host "Triggered kfm-site rebuild."
