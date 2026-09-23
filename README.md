@@ -8,7 +8,7 @@ The original SAM is a lightweight, portable application used to manage achieveme
 
 The client protocol for sending stats and achievements to the companion is described in [PROTOCOL.md](PROTOCOL.md).
 
-[Download the latest KFM Companion.exe](https://github.com/antonk777/KFMLauncher/releases/latest).
+[Download the latest KFM Companion.exe](https://github.com/antonk777/KFMCompanion/releases/latest).
 
 ## Attribution
 
